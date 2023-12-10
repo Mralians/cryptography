@@ -1,4 +1,5 @@
 use finite_field::field_element::*;
+use num::traits::Pow;
 
 const PRIME: &str = "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"; // Prime used in Bitcoin's secp256k1
 
@@ -51,6 +52,15 @@ fn test_division() {
     );
 }
 
+#[test]
+fn test_pow() {
+    let a = new_field_element("cf9fcc1ecf87047d7006df225ee411f70a48a6eb425d6c6e5ab1aaee627e16c1");
+    let result = a.pow(234);
+    assert_eq!(
+        result,
+        new_field_element("dbea5d4a522b629edd8e1570f93fdec743e2da13503c0107a7cb32add0bb4fc5")
+    );
+}
 #[test]
 #[should_panic(expected = "DifferentFields")]
 fn test_different_fields() {

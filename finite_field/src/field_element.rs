@@ -1,5 +1,6 @@
 use super::error::{FieldElementError, Result};
-use num::{BigInt, Num};
+use num::{traits::Pow, BigInt, Num};
+use num_bigint::ToBigInt;
 use std::{
     fmt,
     ops::{Add, Div, Mul, Sub},
@@ -55,6 +56,16 @@ impl Sub for FieldElement {
             num,
             prime: self.prime,
         })
+    }
+}
+impl Pow<usize> for FieldElement {
+    type Output = Self;
+    fn pow(self, rhs: usize) -> Self::Output {
+        let num = self.num.modpow(&rhs.to_bigint().unwrap(), &self.prime);
+        Self {
+            num,
+            prime: self.prime,
+        }
     }
 }
 
