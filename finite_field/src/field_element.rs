@@ -1,5 +1,5 @@
 use super::error::{FieldElementError, Result};
-use num::{traits::Pow, BigInt, Num};
+use num::{traits::Pow, BigInt, FromPrimitive, Num};
 use num_bigint::ToBigInt;
 use std::{
     fmt,
@@ -7,8 +7,8 @@ use std::{
 };
 #[derive(Clone, PartialEq)]
 pub struct FieldElement {
-    num: BigInt,
-    prime: BigInt,
+    pub num: BigInt,
+    pub prime: BigInt,
 }
 
 impl FieldElement {
@@ -21,41 +21,39 @@ impl FieldElement {
         Ok(Self { num, prime })
     }
 
-    fn check_field(&self, other: &Self) -> Result<()> {
+    fn check_field_panic(&self, other: &Self) {
         if self.prime != other.prime {
-            Err(FieldElementError::DifferentFields)
-        } else {
-            Ok(())
+            panic!("DifferentFields");
         }
     }
 }
 
 impl Add for FieldElement {
-    type Output = Result<Self>;
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        self.check_field(&rhs)?;
-        Ok(Self {
+        self.check_field_panic(&rhs);
+        Self {
             num: (&self.num + &rhs.num) % &self.prime,
             prime: self.prime,
-        })
+        }
     }
 }
 
 impl Sub for FieldElement {
-    type Output = Result<Self>;
+    type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self.check_field(&rhs)?;
+        self.check_field_panic(&rhs);
         let num = if self.num < rhs.num {
             &self.prime + &self.num - &rhs.num
         } else {
             &self.num - &rhs.num
         };
-        Ok(Self {
+        Self {
             num,
             prime: self.prime,
-        })
+        }
     }
 }
 impl Pow<usize> for FieldElement {
@@ -70,29 +68,29 @@ impl Pow<usize> for FieldElement {
 }
 
 impl Mul for FieldElement {
-    type Output = Result<Self>;
+    type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        self.check_field(&rhs)?;
-        Ok(Self {
+        self.check_field_panic(&rhs);
+        Self {
             num: (&self.num * &rhs.num) % &self.prime,
             prime: self.prime,
-        })
+        }
     }
 }
 
 impl Div for FieldElement {
-    type Output = Result<Self>;
+    type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self.check_field(&rhs)?;
+        self.check_field_panic(&rhs);
         let inverse = rhs
             .num
             .modpow(&(&self.prime - BigInt::from(2)), &self.prime);
-        Ok(Self {
+        Self {
             num: (&self.num * &inverse) % &self.prime,
             prime: self.prime,
-        })
+        }
     }
 }
 
