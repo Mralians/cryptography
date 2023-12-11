@@ -1,9 +1,7 @@
 use super::error::{PointError, Result};
 use finite_field::field_element::FieldElement;
-use num::bigint::ToBigInt;
 use num::traits::Pow;
 use std::fmt;
-use std::ops::Mul;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point {
     x: Option<FieldElement>,
@@ -19,23 +17,17 @@ impl Point {
         a: FieldElement,
         b: FieldElement,
     ) -> Result<Self> {
-        match (x, y) {
-            (Some(x_val), Some(y_val)) => {
-                let lhs = y_val.pow(2);
-                let rhs = x_val.pow(3) + a.mul(x_val) + b;
-                if lhs != rhs {
-                    Err(PointError::NotOnCurve { x: x_val, y: y_val })
-                } else {
-                    Ok(Point {
-                        x: Some(x_val),
-                        y: Some(y_val),
-                        a,
-                        b,
-                    })
-                }
+        if let (Some(ref x_val), Some(ref y_val)) = (&x, &y) {
+            let lhs = y_val.pow(2);
+            let rhs = x_val.pow(3) + (&a * x_val) + &b;
+            if lhs != rhs {
+                return Err(PointError::NotOnCurve {
+                    x: x_val.clone(),
+                    y: y_val.clone(),
+                });
             }
-            _ => Ok(Point { x, y, a, b }),
         }
+        Ok(Point { x, y, a, b })
     }
 
     // Additional methods (e.g., ec_add_identity, ec_not_eq_point_add, ec_eq_point_add)...
@@ -48,55 +40,16 @@ impl fmt::Display for Point {
 }
 
 #[inline(always)]
-fn ec_add_identity(p1: &Point, p2: &Point) -> Point {
+fn ec_add_identity<'a>(p1: &'a Point, p2: &'a Point) -> &'a Point {
     if p1.x.is_none() {
-        *p2
+        p2
     } else {
-        *p1
+        p1
     }
 }
-// When the points are different.
-// s = (y2 - y1) / (x2 - x1)
-// x3 = s^2 - (x1 - x2)
-// y3 = s * (x1 - x3) - y1
-
-fn ec_not_eq_point_add(p1: Point, p2: Point) -> Point {
-    let x = (p1.x.unwrap(), p2.x.unwrap()); // X pair
-    let y = (p1.y.unwrap(), p2.y.unwrap()); // y pair
-
-    let s = (y.1 - y.0) / (x.1 - x.0);
-    let x3 = s.pow(2) - x.0 - x.1;
-    let y3 = s * (x.0 - x3) - y.0;
-    Point {
-        x: Some(x3),
-        y: Some(y3),
-        a: p1.a,
-        b: p2.b,
-    }
-}
-
-// When p1 == p2
-//  s = (3x1^2 + a) / 2y1
-// x3 = s^2 - 2x1
-// y3 = s * (x1 - x3) - y1
-// fn ec_eq_point_add(p1: Point, p2: Point) -> Point {
-//     let x = (p1.x.unwrap(), p2.x.unwrap());
-//     let y = (p1.y.unwrap(), p2.y.unwrap());
-//
-//     let s = (FieldElement::new(3.to_bigint(), x.0) * x.0.pow(2) + p1.a)
-//         / (2_u64.to_filed_element(x.0.prime) * y.0);
-//     let x3 = s.pow(2) - (2_u64.to_filed_element(x.0.prime) * x.0);
-//     let y3 = s * (x.0 - x3) - y.0;
-//     Point {
-//         x: Some(x3),
-//         y: Some(y3),
-//         a: p1.a,
-//         b: p1.b,
-//     }
-// }
 
 impl std::ops::Add for Point {
-    type Output = Result<()>;
+    type Output = Result<Point>;
 
     fn add(self, rhs: Self) -> Self::Output {
         if self.a != rhs.a || self.b != rhs.b {
@@ -110,17 +63,35 @@ impl std::ops::Add for Point {
             }
 
             // Point addition when points are different
+            // s = (y2 - y1) / (x2 - x1)
+            // x3 = s^2 - (x1 - x2)
+            // y3 = s * (x1 - x3) - y1
             (Some(x1), Some(y1), Some(x2), Some(y2)) if x1 != x2 => {
-                let p = ec_not_eq_point_add(self.clone(), rhs.clone());
-                Ok(())
+                let s = &((y2 - y1) / (x2 - x1));
+                let x3 = s.pow(2) - (x1 - x2);
+                let y3 = s * (x1 - &x3) - y1;
+                Ok(Point::new(Some(x3), Some(y3), self.a, self.b)?)
             }
 
-            // Point doubling
-            // (Some(x), Some(y), _, _) if self == rhs => ec_eq_point_add(x, y, self.a, self.b),
+            // When p1 == p2
+            //  s = (3x1^2 + a) / 2y1
+            // x3 = s^2 - 2x1
+            // y3 = s * (x1 - x3) - y1
+            (Some(x1), Some(y1), Some(_), Some(_)) if self == rhs => {
+                let s = &(3 * x1.pow(2) + &self.a / (2 * y1));
+                let x3 = s.pow(2) - (2 * x1);
+                let y3 = s * (x1 - &x3) - y1;
+                Ok(Point {
+                    x: Some(x3),
+                    y: Some(y3),
+                    a: self.a,
+                    b: self.b,
+                })
+            }
 
             // One of the points is the identity
-            (None, None, _, _) => Ok(()),
-            (_, _, None, None) => Ok(()),
+            // (None, None, _, _) => Ok(()),
+            // (_, _, None, None) => Ok(()),
 
             // Unhandled cases
             _ => Err(PointError::UnhandledAdditionCase),
