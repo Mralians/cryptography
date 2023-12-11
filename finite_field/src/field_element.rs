@@ -39,6 +39,17 @@ impl Add for FieldElement {
         }
     }
 }
+impl<'a, 'b> Add<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+    fn add(self, rhs: &'b FieldElement) -> Self::Output {
+        self.check_field_panic(&rhs);
+        let num = (&self.num + &rhs.num) % &self.prime;
+        FieldElement {
+            num,
+            prime: self.prime.clone(),
+        }
+    }
+}
 
 impl Sub for FieldElement {
     type Output = Self;
@@ -56,6 +67,21 @@ impl Sub for FieldElement {
         }
     }
 }
+impl<'a, 'b> Sub<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+    fn sub(self, rhs: &'b FieldElement) -> Self::Output {
+        self.check_field_panic(&rhs);
+        let num = if self.num < rhs.num {
+            &self.prime + &self.num - &rhs.num
+        } else {
+            &self.num - &rhs.num
+        };
+        FieldElement {
+            num,
+            prime: self.prime.clone(),
+        }
+    }
+}
 impl Pow<usize> for FieldElement {
     type Output = Self;
     fn pow(self, rhs: usize) -> Self::Output {
@@ -66,7 +92,16 @@ impl Pow<usize> for FieldElement {
         }
     }
 }
-
+impl<'a> Pow<usize> for &'a FieldElement {
+    type Output = FieldElement;
+    fn pow(self, rhs: usize) -> Self::Output {
+        let num = self.num.modpow(&rhs.to_bigint().unwrap(), &self.prime);
+        FieldElement {
+            num,
+            prime: self.prime.clone(),
+        }
+    }
+}
 impl Mul for FieldElement {
     type Output = Self;
 
@@ -79,6 +114,16 @@ impl Mul for FieldElement {
     }
 }
 
+impl<'a, 'b> Mul<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+    fn mul(self, rhs: &'b FieldElement) -> Self::Output {
+        self.check_field_panic(&rhs);
+        FieldElement {
+            num: (&self.num * &rhs.num) % &self.prime,
+            prime: self.prime.clone(),
+        }
+    }
+}
 impl Div for FieldElement {
     type Output = Self;
 
@@ -94,6 +139,20 @@ impl Div for FieldElement {
     }
 }
 
+impl<'a, 'b> Div<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn div(self, rhs: &'b FieldElement) -> Self::Output {
+        self.check_field_panic(&rhs);
+        let inverse = rhs
+            .num
+            .modpow(&(&self.prime - BigInt::from(2)), &self.prime);
+        FieldElement {
+            num: (&self.num * &inverse) % &self.prime,
+            prime: self.prime.clone(),
+        }
+    }
+}
 impl fmt::Display for FieldElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "FieldElement_{:x}({:x})", self.prime, self.num)
